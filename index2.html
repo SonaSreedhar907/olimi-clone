@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Olimi AI — Voice AI for MENA</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script>
+tailwind.config={theme:{extend:{fontFamily:{heading:['"Cormorant Garamond"','serif'],body:['"Inter"','sans-serif']},animation:{'fade-in':'fade-in 0.7s ease forwards','marquee':'marquee 40s linear infinite','float':'float 3s ease-in-out infinite','beam-vert':'beam-vert 3s ease-in-out infinite','pulse-slow':'pulse-slow 3s ease-in-out infinite'}}}}
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{overflow-x:hidden;background:#050505}
+::selection{background:#FF7043}
+.no-scrollbar::-webkit-scrollbar{display:none}
+.no-scrollbar{-ms-overflow-style:none;scrollbar-width:none}
+@keyframes fade-in{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-10px)}}
+@keyframes beam-vert{0%{top:0%;opacity:0}50%{opacity:1}100%{top:100%;opacity:0}}
+@keyframes pulse-slow{0%,100%{opacity:.3}50%{opacity:.7}}
+@keyframes waveform{0%,100%{height:30%}50%{height:85%}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useRef,useEffect}=React;
+
+const OrangeDot=()=>(<div className="flex items-center gap-3 mb-6"><div className="w-1.5 h-1.5 rounded-full bg-[#FF7043] shadow-[0_0_12px_rgba(255,112,67,0.6)]"></div><span className="text-[11px] uppercase tracking-[0.2em] text-gray-500 font-body font-medium"></span></div>);
+
+const SectionLabel=({text})=>(<div className="flex items-center gap-3 mb-6"><div className="w-1.5 h-1.5 rounded-full bg-[#FF7043] shadow-[0_0_12px_rgba(255,112,67,0.6)]"></div><span className="text-[11px] uppercase tracking-[0.2em] text-gray-500 font-body font-medium">{text}</span></div>);
+
+const Toggle=({on,onToggle})=>(<button onClick={onToggle} className={`w-10 h-6 rounded-full relative transition-colors duration-200 ${on?'bg-[#FF7043]':'bg-[#2a2a2c]'}`}><div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white transition-all duration-200 ${on?'left-[18px]':'left-0.5'}`}/></button>);
+
+const ChevronDown=({cls="w-4 h-4"})=>(<svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7"/></svg>);
+
+const PhoneIcon=({cls="w-5 h-5"})=>(<svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>);
+
+const MicIcon=({cls="w-10 h-10"})=>(<svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 006-6v-1.5m-6 7.5a6 6 0 01-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 01-3-3V4.5a3 3 0 116 0v8.25a3 3 0 01-3 3z"/></svg>);
+
+const barHeights=[25,40,35,55,45,60,50,70,65,80,55,75,85,60,90,70,95,80,85,75,90,88,92,85,95,90,97,93,95,97];
+
+const industries=['Retail','Financial Services','Insurance','Real Estate','Healthcare','Education/HR','Services/Utilities','Travel/Hospitality'];
+
+const navIndustries=[
+  {t:'Retail',s:'Transform customer experience'},
+  {t:'Financial Services & Insurance',s:'Automate client interactions'},
+  {t:'Real Estate',s:'Qualify leads at scale'},
+  {t:'Healthcare',s:'Streamline patient intake'},
+  {t:'Education/HR',s:'Handle enrollment & queries'},
+  {t:'Services & Utilities',s:'Reduce wait times dramatically'}
+];
+
+const navProducts=[
+  {t:'Text to Speech',s:'Natural voices in 20+ languages'},
+  {t:'Speech to Text',s:'High-accuracy transcription'},
+  {t:'Speech to Speech',s:'Real-time voice translation'},
+  {t:'Voice Experience Widget',s:'Embeddable voice widget'}
+];
+
+function Navbar(){
+  const[mobile,setMobile]=useState(false);
+  const[indDrop,setIndDrop]=useState(false);
+  const[prodDrop,setProdDrop]=useState(false);
+  const[mobInd,setMobInd]=useState(false);
+  const[mobProd,setMobProd]=useState(false);
+  const indTimeout=useRef(null);
+  const prodTimeout=useRef(null);
+  const showInd=()=>{clearTimeout(indTimeout.current);setIndDrop(true)};
+  const hideInd=()=>{indTimeout.current=setTimeout(()=>setIndDrop(false),150)};
+  const showProd=()=>{clearTimeout(prodTimeout.current);setProdDrop(true)};
+  const hideProd=()=>{prodTimeout.current=setTimeout(()=>setProdDrop(false),150)};
+  return(
+    <>
+    <div className="fixed inset-0 z-[100] pointer-events-none">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-20 pt-6">
+        <nav className="pointer-events-auto bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl px-4 md:px-8 h-16 shadow-2xl flex items-center justify-between">
+          <div className="flex items-center gap-8">
+            <span className="font-heading text-white text-[1.5rem] font-semibold tracking-[-0.05em]">Olimi</span>
+            <div className="hidden md:flex items-center gap-6">
+              <div className="relative" onMouseEnter={showInd} onMouseLeave={hideInd}>
+                <button className="flex items-center gap-1 text-[17px] font-normal text-white/60 hover:text-white transition-colors">Industries<ChevronDown cls="w-3.5 h-3.5 mt-0.5"/></button>
+                {indDrop&&(
+                  <div className="absolute top-full left-0 mt-3 w-[360px] bg-black/90 backdrop-blur-2xl border border-white/10 rounded-2xl py-4 shadow-2xl z-50">
+                    {navIndustries.map((item,i)=>(
+                      <div key={i} className="px-5 py-3 hover:bg-white/5 cursor-pointer transition-colors">
+                        <div className="text-white font-medium text-sm">{item.t}</div>
+                        <div className="text-gray-500 text-xs mt-0.5">{item.s}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="relative" onMouseEnter={showProd} onMouseLeave={hideProd}>
+                <button className="flex items-center gap-1 text-[17px] font-normal text-white/60 hover:text-white transition-colors">Products<ChevronDown cls="w-3.5 h-3.5 mt-0.5"/></button>
+                {prodDrop&&(
+                  <div className="absolute top-full left-0 mt-3 w-[360px] bg-black/90 backdrop-blur-2xl border border-white/10 rounded-2xl py-4 shadow-2xl z-50">
+                    {navProducts.map((item,i)=>(
+                      <div key={i} className="px-5 py-3 hover:bg-white/5 cursor-pointer transition-colors">
+                        <div className="text-white font-medium text-sm">{item.t}</div>
+                        <div className="text-gray-500 text-xs mt-0.5">{item.s}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button className="text-[17px] font-normal text-white/60 hover:text-white transition-colors">Company</button>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button className="hidden md:block bg-white text-black rounded-full px-6 py-3 text-sm font-medium hover:scale-[1.03] active:scale-95 transition-transform">Talk to us</button>
+            <button onClick={()=>setMobile(true)} className="md:hidden rounded-2xl border border-white/10 bg-white/5 p-2.5"><svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg></button>
+          </div>
+        </nav>
+      </div>
+    </div>
+    {mobile&&(
+      <div className="fixed inset-0 bg-[#050505] z-[110] flex flex-col p-6">
+        <div className="flex justify-between items-center mb-10">
+          <span className="font-heading text-white text-[1.5rem] font-semibold tracking-[-0.05em]">Olimi</span>
+          <button onClick={()=>setMobile(false)} className="text-white"><svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+        </div>
+        <div className="flex-1 flex flex-col gap-2">
+          <button onClick={()=>setMobInd(!mobInd)} className="flex items-center justify-between text-2xl font-heading font-light text-white py-4 border-b border-white/5">Industries<ChevronDown cls={`w-5 h-5 transition-transform ${mobInd?'rotate-180':''}`}/></button>
+          {mobInd&&navIndustries.map((item,i)=>(<div key={i} className="py-3 pl-6 text-gray-400">{item.t}</div>))}
+          <button onClick={()=>setMobProd(!mobProd)} className="flex items-center justify-between text-2xl font-heading font-light text-white py-4 border-b border-white/5">Products<ChevronDown cls={`w-5 h-5 transition-transform ${mobProd?'rotate-180':''}`}/></button>
+          {mobProd&&navProducts.map((item,i)=>(<div key={i} className="py-3 pl-6 text-gray-400">{item.t}</div>))}
+          <button className="text-2xl font-heading font-light text-white py-4 border-b border-white/5 text-left">Company</button>
+        </div>
+        <button className="bg-white text-black rounded-full py-4 text-base font-medium w-full">Talk to us</button>
+      </div>
+    )}
+    </>
+  );
+}
+
+function Hero(){
+  return(
+    <section className="min-h-screen bg-[#050505] flex flex-col items-center justify-center relative px-4 md:px-20">
+      <div className="absolute bottom-0 right-0 w-[800px] h-[800px] bg-indigo-900/10 rounded-full blur-[100px] pointer-events-none"/>
+      <div className="text-center relative z-10">
+        <h1 className="font-heading font-light text-5xl md:text-8xl leading-[0.9] tracking-tighter opacity-0 animate-fade-in" style={{animationDelay:'0.2s'}}>
+          Voice AI<br/><span className="bg-gradient-to-r from-gray-200 via-gray-400 to-gray-600 text-transparent bg-clip-text">for MENA</span>
+        </h1>
+        <p className="text-gray-400 text-lg font-light max-w-2xl mx-auto mt-8 opacity-0 animate-fade-in" style={{animationDelay:'0.3s'}}>
+          The future of communication. Deploy natural, human-sounding voice agents in 20+ languages. Olimi AI voice agents understand emotion, context, and culture.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-4 mt-10 opacity-0 animate-fade-in" style={{animationDelay:'0.4s'}}>
+          <button className="group flex items-center gap-3 border border-white/10 text-white bg-transparent rounded-full px-7 py-3.5 hover:scale-[1.03] active:scale-95 transition-transform">
+            Call Me<PhoneIcon cls="w-5 h-5 text-[#FF7043] group-hover:translate-x-1 transition-transform"/>
+          </button>
+          <button className="bg-white text-black rounded-full px-7 py-3.5 shadow-lg shadow-white/10 hover:scale-[1.03] active:scale-95 transition-transform text-sm font-medium">Talk to us</button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-0 max-w-5xl w-full mx-auto mt-16 border border-white/10 rounded-3xl p-6 md:p-8 bg-[#050505]/70 backdrop-blur-xl shadow-2xl hover:scale-[1.01] transition-transform opacity-0 animate-fade-in relative z-10" style={{animationDelay:'0.7s'}}>
+        {[['20+','Languages & Dialects'],['<750ms','Latency'],['24/7','Availability'],['100%','Automated']].map(([n,l],i)=>(
+          <div key={i} className="group text-center py-2">
+            <div className="text-3xl text-white font-body group-hover:text-[#FF7043] transition-colors">{n}</div>
+            <div className="text-[10px] text-gray-400 uppercase tracking-[0.15em] mt-1">{l}</div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function VoiceSection(){
+  const cards=['Customer Support','Operations','Lead Qualification','Technical Support'];
+  const allCards=[...cards,...cards,...cards,...cards];
+  return(
+    <section className="bg-[#08080a] py-12 md:py-20 relative overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-b from-[#FF7043]/5 via-[#050505] to-[#08080a] pointer-events-none"/>
+      <div className="max-w-[1920px] mx-auto px-4 md:px-20 relative z-10">
+        <div className="border-t border-white/5 pt-20"/>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+          <div className="order-2 lg:order-1">
+            <SectionLabel text="THE INTERFACE SHIFT"/>
+            <h2 className="font-heading font-light text-5xl md:text-7xl text-white leading-tight">Voice is the ultimate <span className="text-[#FF7043]">interface</span></h2>
+            <p className="text-gray-400 text-xl font-light max-w-xl mt-6">Conversational AI that speaks the language of your customers — literally and emotionally.</p>
+            <div className="space-y-6 mt-10">
+              {[['Zero learning curve for users'],['Handle infinite concurrent interactions'],['Instant resolution via natural conversation'],['Higher customer satisfaction scores (CSAT)']].map(([t],i)=>(
+                <div key={i} className="flex items-start gap-4">
+                  <div className="w-6 h-6 rounded-full bg-[#FF7043]/20 flex items-center justify-center flex-shrink-0 mt-0.5"><svg className="w-3.5 h-3.5 text-[#FF7043]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg></div>
+                  <span className="text-gray-300 text-lg font-light">{t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="order-1 lg:order-2 flex justify-center">
+            <div className="relative group">
+              <div className="aspect-square max-w-[400px] md:max-w-[700px] w-full rounded-full overflow-hidden border border-white/10 bg-gray-800 shadow-[0_0_0px_rgba(255,112,67,0)] group-hover:shadow-[0_0_120px_rgba(255,112,67,0.35)] transition-shadow duration-700 relative">
+                <div className="absolute inset-0 shadow-[inset_0_0_60px_rgba(0,0,0,0.5)]"/>
+                <div className="absolute bottom-0 left-0 right-0 h-1/3 bg-gradient-to-t from-black to-transparent"/>
+              </div>
+              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 flex items-end gap-1">
+                {[0,0.1,0.2,0.3,0.15,0.25,0.05,0.2].map((d,i)=>(
+                  <div key={i} className="w-1 bg-[#FF7043] rounded-full" style={{animation:`waveform 1.2s ease-in-out infinite`,animationDelay:`${d}s`,height:'40%'}}/>
+                ))}
+              </div>
+              <div className="absolute bottom-5 left-1/2 -translate-x-1/2 text-[10px] text-gray-400 uppercase tracking-[0.2em]">Processing Natural Language</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-20 md:mt-28">
+          <h3 className="font-heading font-light text-4xl md:text-6xl text-white max-w-2xl">Unlimited phone agents at your fingertips</h3>
+          <p className="text-gray-400 font-light max-w-xl mt-4">Deploy as many agents as you need — they never sleep, never wait, and never have a bad day.</p>
+        </div>
+
+        <div className="relative mt-12 overflow-hidden h-[350px] md:h-[450px]">
+          <div className="absolute left-0 top-0 bottom-0 w-32 md:w-48 bg-gradient-to-r from-[#08080a] z-20 pointer-events-none"/>
+          <div className="absolute right-0 top-0 bottom-0 w-32 md:w-48 bg-gradient-to-l from-[#08080a] z-20 pointer-events-none"/>
+          <div className="flex animate-marquee">
+            {[0,1].map(set=>(
+              <div key={set} className="flex shrink-0">
+                {allCards.map((label,i)=>(
+                  <div key={`${set}-${i}`} className="group inline-flex flex-col items-center w-[20vw] shrink-0">
+                    <div className="w-[18vw] h-[18vw] rounded-full border border-white/10 bg-gray-800 overflow-hidden grayscale group-hover:grayscale-0 group-hover:scale-[1.03] transition-all duration-500 relative">
+                      <div className="absolute inset-0 shadow-[inset_0_0_40px_rgba(0,0,0,0.5)]"/>
+                    </div>
+                    <span className="text-[10px] md:text-xs uppercase tracking-[0.4em] text-white opacity-40 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-300 mt-4">{label}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EmotionSection(){
+  return(
+    <section className="bg-[#050505] py-0 pb-12 md:pb-24">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-20">
+        <div className="rounded-[40px] bg-[#111] border border-white/5 p-8 md:p-24 relative overflow-hidden hover:border-white/10 transition-colors">
+          <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-[#FF7043]/5 to-transparent pointer-events-none"/>
+          <div className="max-w-4xl mx-auto text-center relative z-10">
+            <div className="text-xs uppercase text-gray-500 tracking-[0.2em] mb-6">Emotionally Intelligent</div>
+            <h2 className="font-heading font-light text-5xl md:text-7xl text-white">The right tone exists</h2>
+            <p className="text-gray-400 text-xl font-light max-w-2xl mx-auto mt-6">Agents that understand caller intent, adapt their tone in real-time, and respond with genuine empathy — turning every conversation into a meaningful connection.</p>
+          </div>
+          <div className="max-w-2xl mx-auto mt-14 space-y-6 relative z-10">
+            <div className="flex items-center gap-4 md:gap-6 bg-white/5 border border-white/5 rounded-3xl rounded-tl-none px-6 md:px-8 py-5 md:translate-x-[-48px]">
+              <div className="w-10 h-10 rounded-full bg-gray-600 flex items-center justify-center text-xs font-medium text-white flex-shrink-0">User</div>
+              <span className="text-gray-200 text-lg font-light">That's actually super helpful, thanks!</span>
+            </div>
+            <div className="flex items-center gap-4 md:gap-6 bg-white/5 border border-[#FF7043]/30 rounded-3xl rounded-tr-none px-6 md:px-8 py-5 md:translate-x-[48px] ml-auto flex-row-reverse">
+              <div className="w-10 h-10 rounded-full bg-[#FF7043] flex items-center justify-center text-xs font-bold text-black flex-shrink-0">AI</div>
+              <span className="text-gray-200 text-lg font-light">Haha, <span className="text-[#FF7043] bg-[#FF7043]/10 px-2 py-0.5 rounded">glad</span> I could make it easier.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PlatformSection(){
+  const[activeTab,setActiveTab]=useState('basic');
+  const[hangup,setHangup]=useState(true);
+  const[transfer,setTransfer]=useState(false);
+  return(
+    <section className="bg-[#050505] pb-12 md:pb-24">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-20">
+        <SectionLabel text="THE PLATFORM"/>
+        <h2 className="font-heading font-light text-5xl md:text-7xl text-white">One platform, infinite <span className="text-[#FF7043]">call flows</span></h2>
+        <p className="text-gray-400 text-xl font-light mt-2">Build smarter agents and test them before they ever go live.</p>
+        <div className="mt-12 bg-[#0E0E10] border border-white/10 rounded-[32px] overflow-hidden shadow-2xl">
+          <div className="h-14 md:h-16 bg-[#141415] border-b border-white/5 flex items-center justify-between px-4 md:px-8">
+            <div className="flex items-center gap-4 md:gap-6">
+              <span className="font-heading text-white text-lg font-semibold tracking-[-0.05em] hidden sm:block">Olimi</span>
+              <div className="w-px h-5 bg-white/10 hidden sm:block"/>
+              {['Basic Settings','Knowledge Base','Test Call'].map(t=>(
+                <button key={t} onClick={()=>setActiveTab(t.toLowerCase().split(' ')[0])} className={`text-xs md:text-sm pb-1 border-b-2 transition-colors hidden md:block ${activeTab===t.toLowerCase().split(' ')[0]?'text-white border-[#FF7043]':'text-gray-500 border-transparent hover:text-white'}`}>{t}</button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded-full border border-red-500/40 opacity-40"/><div className="w-3 h-3 rounded-full border border-yellow-500/40 opacity-40"/><div className="w-3 h-3 rounded-full border border-green-500/40 opacity-40"/>
+            </div>
+          </div>
+          <div className="p-4 md:p-12 bg-[#0c0c0d] grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-12">
+            <div className="lg:col-span-8 flex flex-col gap-6 md:gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Agent Language</label>
+                  <div className="relative">
+                    <select className="w-full bg-[#1A1A1C] border border-white/10 rounded-xl p-3 text-white appearance-none text-sm focus:outline-none focus:border-white/20">
+                      <option>Arabic (Egyptian)</option><option>Arabic (Saudi)</option><option>English (US)</option>
+                    </select>
+                    <ChevronDown cls="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"/>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Voice</label>
+                  <div className="relative">
+                    <select className="w-full bg-[#1A1A1C] border border-white/10 rounded-xl p-3 text-white appearance-none text-sm focus:outline-none focus:border-white/20">
+                      <option>Sarah (Female)</option><option>Hassan (Male)</option><option>Farida (Female)</option>
+                    </select>
+                    <ChevronDown cls="w-4 h-4 text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none"/>
+                  </div>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">System Prompt</label>
+                <div className="bg-[#1A1A1C] border border-white/10 rounded-xl p-4 font-mono text-sm text-gray-300 leading-relaxed relative">
+                  <span className="text-gray-500"># Personality</span><br/>
+                  You are Sarah, a friendly and professional real estate assistant for Premium Estates. You speak warmly, use the caller's first name, and always confirm details before proceeding. You handle objections calmly and offer alternatives proactively.
+                  <div className="absolute bottom-2 right-3 text-gray-600 text-[10px]">Prompt Tokens: 42</div>
+                </div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">First Message / Greeting</label>
+                <div className="bg-[#1A1A1C] border border-white/10 rounded-xl p-4 text-white text-sm">
+                  Hello <span className="text-[#FF7043] bg-[#FF7043]/10 px-1.5 py-0.5 rounded">{'{first_name}'}</span>, this is Sarah from Premium Estates. Is this a good time?
+                </div>
+              </div>
+              <div className="flex items-center justify-between border-t border-b border-white/5 py-4 gap-6">
+                <div className="flex items-center justify-between flex-1"><span className="text-sm text-white">Allow Hangup</span><Toggle on={hangup} onToggle={()=>setHangup(!hangup)}/></div>
+                <div className="w-px h-8 bg-white/5"/>
+                <div className="flex items-center justify-between flex-1"><span className="text-sm text-white">Allow Live Transfer</span><Toggle on={transfer} onToggle={()=>setTransfer(!transfer)}/></div>
+              </div>
+              <div>
+                <label className="text-xs text-gray-500 uppercase tracking-wider mb-2 block">Knowledge Base</label>
+                <div className="border-2 border-dashed border-white/20 rounded-xl p-8 bg-white/[0.02] hover:bg-white/[0.04] transition-colors text-center cursor-pointer">
+                  <svg className="w-10 h-10 text-gray-500 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"/></svg>
+                  <span className="text-gray-400 text-sm">Click to upload (PDF, TXT)</span>
+                </div>
+              </div>
+            </div>
+            <div className="lg:col-span-4">
+              <div className="bg-[#141415] border border-white/10 rounded-2xl p-6 lg:sticky lg:top-28">
+                <div className="flex items-center justify-between mb-8">
+                  <span className="text-sm font-medium text-white">Test Simulator</span>
+                  <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"/><span className="text-xs text-gray-500">Live</span></div>
+                </div>
+                <div className="flex flex-col items-center">
+                  <div className="relative">
+                    <div className="w-32 h-32 rounded-full border-2 border-white/10 flex items-center justify-center relative">
+                      <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#2a2a2d] to-[#1a1a1c] flex items-center justify-center">
+                        <MicIcon cls="w-10 h-10 text-white/50"/>
+                      </div>
+                      <div className="absolute inset-0 rounded-full bg-[#FF7043]/5 animate-pulse-slow"/>
+                    </div>
+                  </div>
+                  <div className="mt-6 text-center">
+                    <div className="text-white font-medium">Testing: Sarah</div>
+                    <div className="text-gray-500 text-sm mt-1">Ready to call</div>
+                  </div>
+                </div>
+                <div className="bg-[#0A0A0B] rounded-xl p-4 border border-white/5 mt-8">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-3">Simulated User Context</div>
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex justify-between"><span className="text-gray-400">Name</span><span className="text-white">Hassan Ali</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400">Phone</span><span className="text-white">+20 123 456 7890</span></div>
+                    <div className="flex justify-between"><span className="text-gray-400">Interest</span><span className="text-[#FF7043]">High Intent</span></div>
+                  </div>
+                </div>
+                <button className="mt-6 bg-white text-black rounded-full w-full py-3 flex items-center justify-center gap-2 text-sm font-medium shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:scale-[1.03] active:scale-95 transition-transform">
+                  <PhoneIcon cls="w-4 h-4"/>Start Test Call
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function AnalyticsSection(){
+  return(
+    <section className="bg-[#050505] pb-12 md:pb-24">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-20">
+        <h2 className="font-heading font-light text-5xl md:text-7xl text-white">Intelligence you can <span className="text-[#FF7043]">measure</span></h2>
+        <p className="text-gray-400 text-xl font-light mt-4 max-w-2xl">Manage campaigns, analyze call sentiment, and track every metric that matters — all in real time.</p>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 md:gap-8 mt-12">
+          <div className="xl:col-span-8 rounded-[40px] bg-[#0A0A0B] border border-white/5 p-6 md:p-10 min-h-[400px] md:min-h-[600px]">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 h-full">
+              <div className="flex flex-col">
+                <h4 className="text-white font-medium mb-1">Active Campaigns</h4>
+                <p className="text-gray-500 text-sm mb-6">3 campaigns running</p>
+                <div className="space-y-3 flex-1">
+                  {[['Real Estate Leads',68],['Healthcare Intake',92],['Support Escalation',45]].map(([name,pct],i)=>(
+                    <div key={i} className="bg-white/[0.02] rounded-2xl p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-white text-sm">{name}</span>
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">Active</span>
+                      </div>
+                      <div className="w-full h-1 bg-white/5 rounded-full"><div className="h-full bg-[#FF7043] rounded-full" style={{width:`${pct}%`}}/></div>
+                      <div className="text-gray-600 text-[10px] mt-1">{pct}% complete</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="md:col-span-2 bg-[#050505] border border-white/5 rounded-3xl p-6 md:p-8 flex flex-col">
+                <div className="flex items-center justify-between mb-2"><h4 className="text-white font-medium text-sm">Global Performance</h4><span className="text-gray-500 text-xs">Analytics Overview</span></div>
+                <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="p-4 md:p-6 rounded-2xl bg-white/[0.02] border border-white/5"><div className="text-white text-lg md:text-xl font-medium">94.8%</div><div className="text-gray-500 text-[10px] mt-1">Intent Accuracy</div></div>
+                  <div className="p-4 md:p-6 rounded-2xl bg-white/[0.02] border border-white/5"><div className="text-white text-lg md:text-xl font-medium">720ms</div><div className="text-gray-500 text-[10px] mt-1">Avg. Latency</div></div>
+                </div>
+                <div className="flex-1 flex items-end gap-[2px] relative min-h-[150px] md:min-h-[200px]">
+                  {barHeights.map((h,i)=>(
+                    <div key={i} className="flex-1 bg-gradient-to-t from-[#FF7043] to-[#FF7043]/40 rounded-t-sm min-w-[4px]" style={{height:`${h}%`,opacity:(i+1)/30}}/>
+                  ))}
+                  <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-[#050505] to-transparent pointer-events-none"/>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="xl:col-span-4 rounded-[40px] bg-[#0A0A0B] border border-white/5 p-6 md:p-10 flex flex-col">
+            <h4 className="text-white font-medium mb-1">Call History</h4>
+            <p className="text-gray-500 text-sm mb-6">Recent conversations</p>
+            <div className="space-y-2 flex-1">
+              {[{name:'Ahmed',time:'2m ago',quote:'I need to reschedule my viewing.',initial:'A'},{name:'Sarah',time:'14m ago',quote:'When is the next intake date?',initial:'S'},{name:'Khaled',time:'1h ago',quote:"I'm calling about policy #421.",initial:'K'}].map((c,i)=>(
+                <div key={i} className="flex items-center gap-3 p-3 md:p-4 rounded-2xl hover:bg-white/[0.02] transition-colors">
+                  <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-sm text-white font-medium flex-shrink-0">{c.initial}</div>
+                  <div className="min-w-0"><div className="flex items-center gap-2"><span className="text-white text-sm">{c.name}</span><span className="text-gray-600 text-xs">{c.time}</span></div><p className="text-gray-400 text-xs truncate mt-0.5">{c.quote}</p></div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-white/5 pt-4 mt-4">
+              <div className="text-[10px] uppercase tracking-wider text-gray-500 mb-2">Live Transcript Preview</div>
+              <div className="bg-[#050505] border border-white/5 rounded-2xl p-4 font-mono text-[11px] leading-relaxed space-y-1">
+                <div><span className="text-[#FF7043]">AGENT:</span> <span className="text-gray-300">How can I help you today?</span></div>
+                <div><span className="text-white">USER:</span> <span className="text-gray-300">I need to reschedule.</span></div>
+                <div><span className="text-[#FF7043]">AGENT:</span> <span className="text-gray-300">Of course, let me pull up...</span></div>
+              </div>
+            </div>
+          </div>
+          <div className="xl:col-span-5 rounded-[40px] bg-[#0A0A0B] border border-white/5 p-6 md:p-10">
+            <div className="flex items-center gap-3 mb-6"><div className="w-9 h-9 rounded-lg bg-[#FF7043]/10 flex items-center justify-center"><svg className="w-5 h-5 text-[#FF7043]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"/></svg></div><h4 className="text-white font-medium">AI Call Summaries</h4></div>
+            <div className="bg-[#050505] border border-white/5 rounded-3xl p-6">
+              <div className="text-gray-500 text-[10px] uppercase tracking-wider mb-4">Summary ID: #XR-92</div>
+              <div className="space-y-3">
+                {[['Customer inquiring about North Coast hotel rates'],['Identified intent as "High Urgency"'],['Scheduled follow-up for tomorrow at 2 PM']].map(([t],i)=>(
+                  <div key={i} className="flex items-start gap-3"><div className="w-1.5 h-1.5 rounded-full bg-[#FF7043] mt-2 flex-shrink-0"/><span className="text-gray-300 text-sm font-light">{t}</span></div>
+                ))}
+              </div>
+            </div>
+            <p className="text-gray-500 text-sm font-light mt-4">Save hours of manual review with AI-generated call summaries.</p>
+          </div>
+          <div className="xl:col-span-7 rounded-[40px] bg-[#0A0A0B] border border-white/5 p-6 md:p-10">
+            <h4 className="text-white font-medium mb-6">Intent & Action Tags</h4>
+            <div className="flex flex-wrap gap-2">
+              {[['Appointment Scheduled','green'],['Frustrated Caller','red'],['New Inquiry','blue'],['Follow-up Required','orange'],['Policy Verified','gray'],['Payment Processed','green'],['Transfer to Human','purple']].map(([t,c],i)=>(
+                <span key={i} className={`px-4 py-2 rounded-xl text-xs border hover:scale-[1.05] transition-transform cursor-default bg-${c}-500/10 text-${c}-400 border-${c}-500/20`}>{t}</span>
+              ))}
+            </div>
+            <div className="grid grid-cols-2 gap-6 mt-10">
+              <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5"><div className="text-gray-500 text-xs uppercase tracking-wider mb-2">Sentiment Score</div><div className="text-white text-2xl font-medium">8.4 <span className="text-gray-500 text-base">/ 10</span></div></div>
+              <div className="bg-white/[0.02] border border-white/5 rounded-2xl p-5"><div className="text-gray-500 text-xs uppercase tracking-wider mb-2">CSAT Improvement</div><div className="text-[#FF7043] text-2xl font-medium">+32%</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function IndustriesSection(){
+  const[activeTab,setActiveTab]=useState('E-commerce');
+  return(
+    <section className="bg-[#050505] pt-12 md:pt-24 pb-12 md:pb-24">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-20">
+        <SectionLabel text="INDUSTRIES"/>
+        <h2 className="font-heading font-light text-5xl md:text-7xl text-white">Built for <span className="bg-gradient-to-r from-[#FF7043] to-[#FFAB91] text-transparent bg-clip-text">every sector</span></h2>
+        <p className="text-gray-400 text-xl font-light mt-4 max-w-2xl">From retail to healthcare, Olimi adapts to your industry's unique requirements and compliance needs.</p>
+        <div className="flex gap-2 md:gap-3 mt-10 overflow-x-auto no-scrollbar pb-2">
+          {industries.map(ind=>(
+            <button key={ind} onClick={()=>setActiveTab(ind)} className={`rounded-full px-4 md:px-6 py-3 text-xs md:text-sm whitespace-nowrap transition-all border ${activeTab===ind?'bg-white text-black border-white':'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-white'}`}>{ind}</button>
+          ))}
+        </div>
+        <div className="w-full bg-[#0A0A0B] border border-white/5 rounded-[32px] flex flex-col lg:flex-row min-h-[500px] mt-8 overflow-hidden">
+          <div className="h-[200px] lg:h-auto lg:w-1/2 bg-gray-900 relative flex-shrink-0">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0A0A0B] via-transparent to-transparent lg:block hidden"/>
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0A0A0B] via-transparent to-transparent lg:hidden"/>
+            <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+              <svg className="w-20 h-20 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={0.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 00-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 00-16.536-1.84M7.5 14.25L5.106 5.272M6 20.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm12.75 0a.75.75 0 11-1.5 0 .75.75 0 011.5 0z"/></svg>
+            </div>
+          </div>
+          <div className="lg:w-1/2 p-6 md:p-12 flex flex-col justify-center relative">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-[#FF7043]/5 to-transparent pointer-events-none rounded-full"/>
+            <h3 className="font-heading text-3xl md:text-5xl text-white">E-commerce</h3>
+            <p className="text-gray-400 font-light mt-4 max-w-md">Automate WISMO calls, handle 24/7 customer support, and increase customer lifetime value with voice agents that never miss a beat.</p>
+            <button className="mt-6 border border-white/20 rounded-full px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors w-fit flex items-center gap-2">Learn More <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3"/></svg></button>
+            <div className="bg-[#141415] rounded-2xl p-6 md:p-8 border border-white/10 mt-8">
+              <div className="flex items-center gap-2 mb-6"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"/><span className="text-[10px] uppercase tracking-wider text-gray-500">Live Agent Flow</span></div>
+              <div className="space-y-4">
+                {[
+                  'Hi {name}, thank you for calling StyleHub. Let me pull up your order.',
+                  'I have the order you placed on {api.date} pulled up. It looks like it\'s {api.status}. What can I help with?'
+                ].map((msg,i)=>(
+                  <div key={i} className="flex items-start gap-3">
+                    {i>0&&<div className="w-0.5 h-6 bg-white/10 ml-4 mt-[-8px]"/>}
+                    <div className="w-8 h-8 rounded-full bg-[#FF7043]/20 border border-[#FF7043]/30 flex items-center justify-center flex-shrink-0">
+                      <div className="w-2 h-2 rounded-full bg-[#FF7043]"/>
+                    </div>
+                    <div><div className="text-[#FF7043] text-[10px] uppercase tracking-wider">Olimi Agent</div><p className="text-gray-300 text-sm font-light mt-1">{msg}</p></div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 mt-6">
+                {['Track Order','Return','Agent'].map(t=>(<span key={t} className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-gray-400 text-xs">{t}</span>))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function EcosystemSection(){
+  const orbitItems=[
+    {name:'Slack',pos:{left:'81%',top:'14%'},delay:'0s',emoji:'💬'},
+    {name:'Salesforce',pos:{left:'90%',top:'50%'},delay:'0.5s',emoji:'☁️'},
+    {name:'HubSpot',pos:{left:'81%',top:'82%'},delay:'1s',emoji:'🟠'},
+    {name:'Odoo',pos:{left:'19%',top:'82%'},delay:'1.5s',emoji:'📦'},
+    {name:'Google Cal',pos:{left:'10%',top:'50%'},delay:'2s',emoji:'📅'},
+    {name:'Shopify',pos:{left:'19%',top:'14%'},delay:'2.5s',emoji:'🛍️'}
+  ];
+  return(
+    <section className="bg-[#050505] py-12 md:py-24 relative overflow-hidden">
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[1000px] bg-indigo-900/10 rounded-full blur-[120px] pointer-events-none"/>
+      <div className="max-w-[1920px] mx-auto px-4 md:px-20 relative z-10">
+        <div className="text-center mb-16">
+          <span className="inline-block bg-[#FF7043]/10 text-[#FF7043] text-xs font-medium px-4 py-1.5 rounded-full mb-6">The Olimi Ecosystem</span>
+          <h2 className="font-heading font-light text-5xl md:text-7xl text-white">Your stack, <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-[#FF7043] text-transparent bg-clip-text">supercharged.</span></h2>
+          <p className="text-gray-400 text-xl font-light max-w-2xl mx-auto mt-6">Seamlessly integrates with your existing tools, workflows, and infrastructure.</p>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
+          <div className="lg:col-span-2 bg-[#0A0A0B] border border-white/5 rounded-[40px] p-6 md:p-10 min-h-[400px] md:min-h-[700px] overflow-hidden relative group hover:border-white/10 transition-colors">
+            <div className="absolute inset-0 bg-radial opacity-0 group-hover:opacity-100 transition-opacity duration-700" style={{background:'radial-gradient(circle at 30% 50%, rgba(59,130,246,0.08), transparent 60%)'}}/>
+            <h4 className="text-white font-medium text-xl mb-2 relative z-10">Deeply Integrated</h4>
+            <p className="text-gray-400 text-sm mb-6 relative z-10">Connect with the tools your team already uses.</p>
+            <div className="relative flex-1 min-h-[300px] md:min-h-[500px]">
+              <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet">
+                <circle cx="50" cy="50" r="36" fill="none" stroke="rgba(255,255,255,0.05)" strokeDasharray="4 4"/>
+                {orbitItems.map((item,i)=>{
+                  const cx=parseFloat(item.pos.left);
+                  const cy=parseFloat(item.pos.top);
+                  return(<line key={i} x1="50" y1="50" x2={cx} y2={cy} stroke="rgba(255,255,255,0.08)" strokeWidth="0.2"/>);
+                })}
+              </svg>
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-28 h-28 md:w-32 md:h-32 rounded-full border-2 border-white/20 bg-gradient-to-br from-[#1a1a1c] to-black flex items-center justify-center shadow-[0_0_60px_rgba(255,112,67,0.2)] z-10">
+                <div className="w-16 h-16 md:w-20 md:h-20 rounded-full bg-gray-700 flex items-center justify-center grayscale hover:grayscale-0 transition-all">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
+                </div>
+              </div>
+              {orbitItems.map((item,i)=>(
+                <div key={i} className="absolute w-16 h-16 md:w-24 md:h-24 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 flex flex-col items-center justify-center animate-float z-10" style={{left:item.pos.left,top:item.pos.top,transform:'translate(-50%,-50%)',animationDelay:item.delay}}>
+                  <span className="text-lg md:text-2xl">{item.emoji}</span>
+                  <span className="text-[8px] md:text-[10px] text-gray-400 mt-1">{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="lg:col-span-1 bg-[#0A0A0B] border border-white/5 rounded-[40px] p-6 md:p-10 min-h-[400px] md:min-h-[700px] flex flex-col hover:border-white/10 transition-colors">
+            <h4 className="text-white font-medium text-xl mb-2">Post-call Action</h4>
+            <p className="text-gray-400 text-sm mb-8">Automated follow-ups triggered by every call.</p>
+            <div className="flex flex-col items-center gap-0 flex-1 justify-center">
+              {[
+                {title:'Call Completed',sub:'Voice AI',color:'bg-blue-500/20',iconColor:'text-blue-400',icon:(
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"/></svg>
+                )},
+                {title:'Send WhatsApp / SMS',sub:'Messaging',color:'bg-[#FF7043]/20',iconColor:'text-[#FF7043]',icon:(
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/></svg>
+                )},
+                {title:'Open Ticket / Update CRM',sub:'CRM',color:'bg-purple-500/20',iconColor:'text-purple-400',icon:(
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/></svg>
+                )}
+              ].map((block,i)=>(
+                <React.Fragment key={i}>
+                  {i>0&&(
+                    <div className="relative h-8 w-px bg-white/10">
+                      <div className="absolute w-1 h-4 bg-gradient-to-b from-[#FF7043] to-transparent rounded-full animate-beam-vert"/>
+                    </div>
+                  )}
+                  <div className="bg-[#141415] border border-white/10 rounded-2xl p-4 flex items-center gap-4 w-full">
+                    <div className={`w-10 h-10 rounded-full ${block.color} flex items-center justify-center ${block.iconColor} flex-shrink-0`}>{block.icon}</div>
+                    <div><div className="text-white font-medium text-sm">{block.title}</div><div className="text-[10px] uppercase tracking-wider text-gray-500 mt-0.5">Action · {block.sub}</div></div>
+                  </div>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+          <div className="lg:col-span-1 bg-[#0A0A0B] border border-white/5 rounded-[40px] p-6 md:p-10 min-h-[350px] md:min-h-[400px] hover:border-white/10 transition-colors">
+            <h4 className="text-white font-medium text-xl mb-2">Unparalleled Support</h4>
+            <p className="text-gray-400 text-sm mb-6">Priority access to our dedicated team.</p>
+            <div className="bg-[#141415] border border-white/10 rounded-2xl p-5 flex flex-col gap-4">
+              <div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"/><span className="text-[10px] uppercase tracking-wider text-gray-500">Priority Channel</span></div>
+              <div className="space-y-3">
+                <div className="bg-blue-500/10 rounded-2xl rounded-tr-none p-3 ml-auto max-w-[85%]"><p className="text-sm text-gray-200">We need to deploy 3 multilingual agents in another market ASAP.</p></div>
+                <div className="bg-[#1e1e20] rounded-2xl rounded-tl-none p-3 max-w-[85%]">
+                  <div className="flex items-center gap-2 mb-1.5"><div className="w-5 h-5 rounded-full bg-[#FF7043] flex items-center justify-center text-[8px] font-bold text-black">OS</div><span className="text-[10px] text-[#FF7043] uppercase tracking-wider">Olimi Support</span></div>
+                  <p className="text-sm text-gray-300">Done. We've updated the system prompt on live agents. Anything else?</p>
+                </div>
+                <div className="bg-blue-500/10 rounded-2xl rounded-tr-none p-3 ml-auto max-w-[60%]"><p className="text-sm text-gray-200">That was fast! Thanks.</p></div>
+              </div>
+            </div>
+          </div>
+          <div className="lg:col-span-2 bg-[#0A0A0B] border border-white/5 rounded-[40px] p-6 md:p-10 min-h-[350px] md:min-h-[400px] flex flex-col md:flex-row gap-8 md:gap-12 hover:border-white/10 transition-colors">
+            <div className="flex-1">
+              <h4 className="text-white font-medium text-xl mb-2">Enterprise Security</h4>
+              <p className="text-gray-400 text-sm mb-6">Bank-grade protection for every interaction.</p>
+              <div className="flex flex-wrap gap-3">
+                <span className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-lg font-mono text-xs"><div className="w-2 h-2 rounded-full bg-green-400"/><span className="text-white">COMPLIANT</span></span>
+                <span className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-lg font-mono text-xs"><svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg><span className="text-white">ENCRYPTED</span></span>
+              </div>
+            </div>
+            <div className="bg-[#141415] border border-white/10 rounded-2xl p-6 md:p-8 flex-1">
+              <div className="flex items-center justify-between mb-6"><span className="text-white text-sm font-medium">Security & Compliance</span><div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-full border border-red-500/40 opacity-40"/><div className="w-3 h-3 rounded-full border border-yellow-500/40 opacity-40"/><div className="w-3 h-3 rounded-full border border-green-500/40 opacity-40"/></div></div>
+              <div className="space-y-4">
+                {[
+                  {name:'PII Redaction',sub:'Strip sensitive data',toggle:true},
+                  {name:'Strict Guardrails',sub:'Enforce conversation rules',toggle:true},
+                  {name:'Data Residency',sub:'Choose your region',badge:'KSA (Riyadh)'},
+                  {name:'On-Premise',sub:'Self-hosted option',badge:'ENTERPRISE',badgeColor:'bg-blue-500/10 text-blue-400'}
+                ].map((row,i)=>(
+                  <div key={i} className="flex items-center justify-between">
+                    <div><div className="text-white text-sm">{row.name}</div><div className="text-gray-600 text-xs">{row.sub}</div></div>
+                    {row.toggle!==undefined?<Toggle on={row.toggle} onToggle={()=>{}}/>:row.badge&&<span className={`text-[10px] px-3 py-1 rounded-lg font-medium ${row.badgeColor||'bg-white/10 text-white'}`}>{row.badge}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CTASection(){
+  const words=['Real-time','Multilingual','Empathetic','Inbound','Outbound','Voice Agents','Available 24/7','Infinitely Scalable'];
+  return(
+    <section className="bg-[#050505] pt-16 pb-0 relative">
+      <div className="absolute inset-0 pointer-events-none" style={{background:'radial-gradient(ellipse at center, rgba(255,255,255,0.03), #050505 70%)'}}/>
+      <div className="max-w-[1920px] mx-auto px-4 md:px-20 relative z-10 text-center pb-12 md:pb-16">
+        <h2 className="font-heading font-light text-6xl md:text-8xl tracking-tighter">Ready to <span className="text-gray-500">start?</span></h2>
+        <p className="text-gray-400 text-lg font-light mt-6 mb-8">Join the companies transforming customer experience with voice AI.</p>
+        <button className="bg-white text-black rounded-full px-8 py-4 text-sm font-medium shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:scale-[1.03] active:scale-95 transition-transform">Talk to us</button>
+      </div>
+      <div className="w-full h-[20vw] md:h-[25vw] overflow-hidden relative">
+        <div className="flex animate-marquee whitespace-nowrap">
+          {[0,1].map(set=>(
+            <div key={set} className="flex shrink-0 items-center">
+              {words.map((w,i)=>(
+                <span key={`${set}-${i}`} className="text-[15vw] md:text-[18vw] font-bold tracking-tighter text-transparent bg-clip-text bg-gradient-to-b from-white/10 via-white/5 to-transparent px-2 md:px-4">{w}</span>
+              ))}
+              <span className="text-[15vw] md:text-[18vw] text-white/5 px-1 md:px-2">*</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FooterSection(){
+  return(
+    <footer className="bg-[#050505] pt-12 md:pt-20 pb-10">
+      <div className="max-w-[1920px] mx-auto px-4 md:px-20">
+        <div className="border-t border-white/5 pt-12 md:pt-16">
+          <div className="flex flex-col lg:flex-row justify-between gap-10 lg:gap-16">
+            <div className="max-w-md">
+              <span className="font-heading text-white text-[1.5rem] font-semibold tracking-[-0.05em]">Olimi</span>
+              <p className="text-gray-500 text-lg font-light mt-4">Voice intelligence built for MENA</p>
+            </div>
+            <div className="flex flex-wrap gap-10 md:gap-20">
+              {[['INDUSTRIES',['Retail','Financial Services','Real Estate','Healthcare','Education/HR','Services & Utilities']],['PRODUCTS',['Text to Speech','Speech to Text','Speech to Speech','Voice Experience']],['COMPANY',['Careers','Contact']],['RESOURCES',['Privacy Policy','Terms of Service']]].map(([header,links])=>(
+                <div key={header}>
+                  <div className="text-[11px] uppercase text-gray-500 tracking-wider mb-6 md:mb-8">{header}</div>
+                  <div className="space-y-3">
+                    {links.map(l=>(<a key={l} href="#" className="block text-white/80 hover:text-white text-base font-normal transition-colors">{l}</a>))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="border-t border-white/5 pt-8 mt-12 md:mt-16 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <span className="text-gray-600 text-sm font-medium">&copy; 2026 Olimi AI, Inc.</span>
+            <a href="#" className="text-gray-500 hover:text-white transition-colors">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+function FloatingWidget(){
+  return(
+    <div className="fixed bottom-4 md:bottom-8 right-4 md:right-8 z-[999] flex flex-col items-end gap-2 md:gap-3">
+      <div className="w-60 md:w-64 h-14 rounded-full bg-[#050505] border border-white/10 shadow-xl hover:shadow-[0_8px_40px_rgba(255,112,67,0.15)] hover:scale-[1.02] transition-all duration-300 flex items-center relative overflow-hidden cursor-pointer">
+        <div className="absolute left-1.5 w-9 h-9 rounded-full bg-gradient-to-br from-[#ffe0b2] to-[#FF7043] flex items-center justify-center shadow-[0_0_20px_rgba(255,112,67,0.4)] z-10">
+          <svg className="w-4 h-4 text-[#475569]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" d="M3 12h2m14 0h2M7 8v8m4-12v16m4-12v8"/></svg>
+        </div>
+        <span className="absolute left-14 text-gray-100 text-lg font-light tracking-tight">Voice Experience</span>
+        <div className="absolute right-1.5 w-9 h-9 rounded-full border border-white/20 overflow-hidden flex items-center justify-center text-sm">🇪🇬</div>
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent pointer-events-none"/>
+      </div>
+      <div className="text-[10px] text-white font-light drop-shadow-lg">Powered by <span className="text-[#FFAB91]">Olimi AI</span></div>
+    </div>
+  );
+}
+
+function App(){
+  return(
+    <div className="font-body bg-[#050505] text-white">
+      <Navbar/>
+      <Hero/>
+      <VoiceSection/>
+      <EmotionSection/>
+      <PlatformSection/>
+      <AnalyticsSection/>
+      <IndustriesSection/>
+      <EcosystemSection/>
+      <CTASection/>
+      <FooterSection/>
+      <FloatingWidget/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
